@@ -3,91 +3,113 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Black & White Strategy</title>
+    <title>Black & White - Sky Blue Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@700;900&display=swap');
-        body { font-family: 'Pretendard', sans-serif; }
-        .black-t { background-color: #000; color: #fff; border: 2px solid #333; }
-        .white-t { background-color: #fff; color: #000; border: 2px solid #ddd; }
-        .selected-t { ring: 4px solid #3b82f6; ring-offset: 2px; transform: translateY(-5px); }
+        body { font-family: 'Pretendard', sans-serif; background-color: #bae6fd; color: #111; }
+        .black-t { background-color: #111; color: #fff; border: 2px solid #333; }
+        .white-t { background-color: #fff; color: #111; border: 2px solid #ddd; }
+        .selected-t { ring: 4px solid #2563eb; ring-offset: 2px; transform: translateY(-5px); }
         .used-t { opacity: 0.1; pointer-events: none; }
+        /* 대결 판 가시성 개선 (갈색톤 유지) */
+        .battle-board { background-color: #5d4d3f; border: 4px solid #4a3c30; box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.3); }
+        .history-row { border-bottom: 1px solid rgba(0,0,0,0.1); padding: 8px 0; }
+        .win-t { color: #1d4ed8; font-weight: 900; }
+        .loss-t { color: #dc2626; font-weight: 900; }
+        .draw-t { color: #4b5563; font-weight: 900; }
     </style>
 </head>
-<body class="bg-zinc-950 text-zinc-100 min-h-screen flex items-center justify-center p-4">
+<body class="min-h-screen flex items-center justify-center p-4">
 
-    <!-- 초기 설정 -->
-    <div id="start-overlay" class="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center p-6 text-center">
-        <h1 class="text-6xl font-black mb-4 tracking-tighter">BLACK & WHITE</h1>
-        <p class="text-zinc-500 mb-10">짝수는 흑(Black), 홀수는 백(White)</p>
+    <!-- 시작 화면 (하늘색 배경 / 검정 글씨) -->
+    <div id="start-overlay" class="fixed inset-0 z-50 bg-sky-200 flex flex-col items-center justify-center p-6 text-center">
+        <h1 class="text-7xl font-black mb-4 tracking-tighter text-black">BLACK & WHITE</h1>
+        <p class="text-sky-900 font-bold mb-10">짝수: 흑(0,2,4,6,8) | 홀수: 백(1,3,5,7)</p>
         <div class="flex flex-col w-64 gap-3">
-            <button onclick="init(true)" class="py-4 bg-white text-black font-black rounded-2xl hover:bg-zinc-200 transition">PLAYER 선공</button>
-            <button onclick="init(false)" class="py-4 bg-zinc-800 text-white font-black rounded-2xl hover:bg-zinc-700 transition">AI 선공</button>
+            <button onclick="init(true)" class="py-4 bg-black text-white font-black rounded-2xl hover:bg-zinc-800 transition shadow-xl">내 선공 시작</button>
+            <button onclick="init(false)" class="py-4 bg-white text-black font-black border-2 border-black rounded-2xl hover:bg-zinc-100 transition shadow-xl">AI 선공 시작</button>
         </div>
     </div>
 
-    <!-- 메인 게임 -->
-    <div id="game-wrap" class="w-full max-w-xl hidden">
-        <div class="flex justify-between items-center mb-8">
-            <div class="text-center">
-                <p class="text-[10px] text-zinc-500 font-bold uppercase">Player</p>
-                <p id="p-score" class="text-5xl font-black">0</p>
-            </div>
-            <div class="text-center">
-                <div id="round-txt" class="text-xs font-bold bg-zinc-800 px-3 py-1 rounded-full text-zinc-400 mb-2">ROUND 1</div>
-                <div id="turn-txt" class="text-sm font-bold text-blue-500">대기 중</div>
-            </div>
-            <div class="text-center">
-                <p class="text-[10px] text-zinc-500 font-bold uppercase">AI Bot</p>
-                <p id="a-score" class="text-5xl font-black">0</p>
-            </div>
-        </div>
-
-        <!-- AI 영역 -->
-        <div id="ai-hand" class="flex justify-center gap-1 mb-10 h-10"></div>
-
-        <!-- 대결 슬롯 -->
-        <div class="bg-zinc-900 rounded-3xl p-8 mb-10 border border-zinc-800">
-            <div class="flex justify-around items-center gap-4">
-                <div class="flex flex-col items-center gap-2">
-                    <div id="p-slot" class="w-20 h-28 rounded-2xl border-2 border-dashed border-zinc-700 flex items-center justify-center text-4xl font-black transition-all">?</div>
-                    <span class="text-[10px] font-bold text-zinc-600">MY SLOT</span>
+    <!-- 메인 게임 영역 (하늘색 배경) -->
+    <div id="game-wrap" class="w-full max-w-5xl hidden flex flex-col lg:flex-row gap-8 items-start">
+        
+        <!-- 왼쪽: 메인 게임 보드 -->
+        <div class="flex-1 bg-white/40 backdrop-blur-md p-8 rounded-[40px] border border-white/20 shadow-2xl">
+            <div class="flex justify-between items-center mb-10">
+                <div class="text-center">
+                    <p class="text-[10px] text-sky-900 font-bold uppercase tracking-widest">Player Score</p>
+                    <p id="p-score" class="text-6xl font-black text-black">0</p>
                 </div>
-                <div class="text-2xl font-black text-zinc-800">VS</div>
-                <div class="flex flex-col items-center gap-2">
-                    <div id="a-slot" class="w-20 h-28 rounded-2xl border-2 border-dashed border-zinc-700 flex items-center justify-center text-4xl font-black transition-all">?</div>
-                    <span class="text-[10px] font-bold text-zinc-600">AI SLOT</span>
+                <div class="text-center">
+                    <div id="round-txt" class="text-xs font-bold bg-black/10 px-4 py-1 rounded-full text-black mb-2">ROUND 1</div>
+                    <div id="turn-txt" class="text-sm font-black text-blue-700">당신의 차례</div>
+                </div>
+                <div class="text-center">
+                    <p class="text-[10px] text-sky-900 font-bold uppercase tracking-widest">AI Bot Score</p>
+                    <p id="a-score" class="text-6xl font-black text-black">0</p>
                 </div>
             </div>
-        </div>
 
-        <!-- 메시지 및 컨트롤 -->
-        <div class="text-center mb-10">
-            <p id="msg" class="text-xl font-black text-zinc-300">타일을 골라주세요</p>
-            <div class="mt-6 flex justify-center">
-                <button id="btn-match" onclick="doMatch()" class="hidden px-14 py-4 bg-blue-600 text-white font-black rounded-2xl shadow-xl active:scale-95 transition">MATCH</button>
-                <button id="btn-next" onclick="nextRound()" class="hidden px-14 py-4 bg-zinc-100 text-black font-black rounded-2xl shadow-xl active:scale-95 transition">NEXT ROUND</button>
+            <!-- AI 보유 타일 공개 정보 -->
+            <div class="mb-8">
+                <p class="text-center text-[10px] font-bold text-sky-950 mb-3 tracking-widest">AI REMAINING TILES</p>
+                <div id="ai-hand" class="flex justify-center gap-2 h-12"></div>
+            </div>
+
+            <!-- 대결 슬롯 -->
+            <div class="battle-board rounded-[32px] p-10 mb-10">
+                <div class="flex justify-around items-center">
+                    <div class="flex flex-col items-center gap-3">
+                        <div id="p-slot" class="w-24 h-36 rounded-2xl border-2 border-dashed border-white/30 flex items-center justify-center text-5xl font-black bg-black/10 text-white">?</div>
+                        <span class="text-[10px] font-bold text-white/70 uppercase">PLAYER</span>
+                    </div>
+                    <div class="text-4xl font-black text-white/10 italic">VS</div>
+                    <div class="flex flex-col items-center gap-3">
+                        <div id="a-slot" class="w-24 h-36 rounded-2xl border-2 border-dashed border-white/30 flex items-center justify-center text-5xl font-black bg-black/10 text-white">?</div>
+                        <span class="text-[10px] font-bold text-white/70 uppercase">AI BOT</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 제어부 -->
+            <div class="text-center mb-10 h-14">
+                <p id="msg" class="text-xl font-black text-black">타일을 한 개 선택하세요</p>
+                <div class="mt-4 flex justify-center gap-4">
+                    <button id="btn-match" onclick="doMatch()" class="hidden px-16 py-4 bg-blue-700 text-white font-black rounded-2xl shadow-xl hover:scale-105 active:scale-95 transition">MATCH</button>
+                    <button id="btn-next" onclick="nextRound()" class="hidden px-16 py-4 bg-black text-white font-black rounded-2xl shadow-xl hover:scale-105 active:scale-95 transition">NEXT ROUND</button>
+                </div>
+            </div>
+
+            <!-- 내 타일 목록 -->
+            <div class="bg-black/5 p-6 rounded-[32px] border border-black/5">
+                <p class="text-center text-[10px] font-bold text-black/40 mb-4 tracking-widest uppercase">My Tiles</p>
+                <div id="p-hand" class="flex justify-center gap-3 flex-wrap"></div>
             </div>
         </div>
 
-        <!-- 내 손패 -->
-        <div class="bg-black p-6 rounded-3xl border border-zinc-800">
-            <div id="p-hand" class="flex justify-center gap-2 flex-wrap"></div>
+        <!-- 오른쪽: 전적 기록판 -->
+        <div class="w-full lg:w-64 bg-white/60 backdrop-blur-md p-6 rounded-[32px] border border-white/30 flex flex-col h-auto lg:min-h-[600px] shadow-2xl">
+            <h3 class="text-sm font-black text-black mb-6 uppercase tracking-[0.2em] text-center border-b border-black/5 pb-4">Match History</h3>
+            <div id="history-list" class="flex-1 overflow-y-auto space-y-0 text-xs">
+                <!-- History rows -->
+            </div>
         </div>
     </div>
 
-    <!-- 결과 -->
-    <div id="result-overlay" class="fixed inset-0 z-[60] bg-black hidden flex flex-col items-center justify-center p-6">
-        <h2 id="final-res" class="text-8xl font-black mb-4 italic tracking-tighter">VICTORY</h2>
-        <p id="final-scr" class="text-2xl font-bold text-zinc-500 mb-12">5 : 2</p>
-        <button onclick="location.reload()" class="px-14 py-5 bg-white text-black font-black rounded-2xl text-xl transition active:scale-95">RESTART</button>
+    <!-- 게임 종료 팝업 -->
+    <div id="result-overlay" class="fixed inset-0 z-[60] bg-white/95 backdrop-blur-xl hidden flex flex-col items-center justify-center p-6 text-center">
+        <h2 id="final-res" class="text-9xl font-black mb-6 italic tracking-tighter">WIN</h2>
+        <p id="final-scr" class="text-3xl font-bold text-zinc-500 mb-14">5 : 2</p>
+        <button onclick="location.reload()" class="px-20 py-6 bg-black text-white font-black rounded-3xl text-2xl hover:bg-zinc-800 transition active:scale-95 shadow-2xl">REMATCH</button>
     </div>
 
     <script>
         let pTiles = [0, 1, 2, 3, 4, 5, 6, 7, 8];
         let aTiles = [0, 1, 2, 3, 4, 5, 6, 7, 8];
         let pScore = 0, aScore = 0, rNum = 1;
-        let pFirst = true; // 교대용
+        let pFirst = true;
         let curP = null, curA = null;
 
         const checkB = (n) => n % 2 === 0;
@@ -104,25 +126,26 @@
             curP = null; curA = null;
             document.getElementById('round-txt').innerText = `ROUND ${rNum}`;
             document.getElementById('p-slot').innerText = "?";
-            document.getElementById('p-slot').className = "w-20 h-28 rounded-2xl border-2 border-dashed border-zinc-700 flex items-center justify-center text-4xl font-black transition-all";
+            document.getElementById('p-slot').className = "w-24 h-36 rounded-2xl border-2 border-dashed border-white/30 flex items-center justify-center text-5xl font-black bg-black/10 text-white transition-all";
             document.getElementById('a-slot').innerText = "?";
-            document.getElementById('a-slot').className = "w-20 h-28 rounded-2xl border-2 border-dashed border-zinc-700 flex items-center justify-center text-4xl font-black transition-all";
+            document.getElementById('a-slot').className = "w-24 h-36 rounded-2xl border-2 border-dashed border-white/30 flex items-center justify-center text-5xl font-black bg-black/10 text-white transition-all";
             document.getElementById('btn-match').classList.add('hidden');
             document.getElementById('btn-next').classList.add('hidden');
             
             refreshUI();
 
             if (!pFirst) {
-                // AI 선공
                 const idx = Math.floor(Math.random() * aTiles.length);
                 curA = aTiles[idx];
                 document.getElementById('turn-txt').innerText = "AI 선공";
-                document.getElementById('msg').innerText = "상대 타일 색상을 확인하세요";
+                document.getElementById('turn-txt').className = "text-sm font-black text-red-600";
+                document.getElementById('msg').innerText = "상대 타일의 색을 보고 대응하세요";
                 const aSlot = document.getElementById('a-slot');
-                aSlot.className = `w-20 h-28 rounded-2xl flex items-center justify-center text-4xl font-black shadow-2xl ${getStyle(curA)}`;
+                aSlot.className = `w-24 h-36 rounded-2xl flex items-center justify-center text-5xl font-black shadow-2xl transition-all ${getStyle(curA)}`;
             } else {
-                document.getElementById('turn-txt').innerText = "PLAYER 선공";
-                document.getElementById('msg').innerText = "먼저 낼 타일을 고르세요";
+                document.getElementById('turn-txt').innerText = "플레이어 선공";
+                document.getElementById('turn-txt').className = "text-sm font-black text-blue-700";
+                document.getElementById('msg').innerText = "타일을 먼저 제출하세요";
             }
         }
 
@@ -131,10 +154,11 @@
             const aH = document.getElementById('ai-hand');
             pH.innerHTML = ''; aH.innerHTML = '';
 
+            pTiles.sort((a,b) => a-b); 
             [0, 1, 2, 3, 4, 5, 6, 7, 8].forEach(n => {
                 const used = !pTiles.includes(n);
                 const d = document.createElement('div');
-                d.className = `w-12 h-16 rounded-xl flex items-center justify-center font-black text-xl cursor-pointer transition-all ${getStyle(n)} ${used ? 'used-t' : ''}`;
+                d.className = `w-14 h-20 rounded-2xl flex items-center justify-center font-black text-2xl cursor-pointer transition-all shadow-md ${getStyle(n)} ${used ? 'used-t' : ''}`;
                 d.innerText = n;
                 if(!used) d.onclick = () => pick(n, d);
                 pH.appendChild(d);
@@ -143,7 +167,8 @@
             [0, 1, 2, 3, 4, 5, 6, 7, 8].forEach(n => {
                 const used = !aTiles.includes(n);
                 const d = document.createElement('div');
-                d.className = `w-6 h-8 rounded-md ${getStyle(n)} ${used ? 'opacity-0' : 'opacity-100'}`;
+                d.className = `w-8 h-12 rounded-lg flex items-center justify-center font-black text-xs ${getStyle(n)} ${used ? 'opacity-10' : 'opacity-100 shadow-sm border border-black/10'}`;
+                d.innerText = n;
                 aH.appendChild(d);
             });
         }
@@ -154,7 +179,7 @@
             el.classList.add('selected-t');
             const pS = document.getElementById('p-slot');
             pS.innerText = n;
-            pS.className = `w-20 h-28 rounded-2xl flex items-center justify-center text-4xl font-black shadow-2xl ${getStyle(n)}`;
+            pS.className = `w-24 h-36 rounded-2xl flex items-center justify-center text-5xl font-black shadow-2xl transition-all ${getStyle(n)}`;
             document.getElementById('btn-match').classList.remove('hidden');
         }
 
@@ -168,20 +193,40 @@
 
             const aS = document.getElementById('a-slot');
             aS.innerText = curA;
-            aS.className = `w-20 h-28 rounded-2xl flex items-center justify-center text-4xl font-black shadow-2xl ${getStyle(curA)}`;
+            aS.className = `w-24 h-36 rounded-2xl flex items-center justify-center text-5xl font-black shadow-2xl transition-all ${getStyle(curA)}`;
 
-            let res = "";
-            if (curP > curA) { pScore++; res = "ROUND WIN"; }
-            else if (curP < curA) { aScore++; res = "ROUND LOSS"; }
-            else { res = "DRAW"; }
+            let resText = "";
+            let style = "";
+            if (curP > curA) { pScore++; resText = "WIN"; style = "win-t"; }
+            else if (curP < curA) { aScore++; resText = "LOSS"; style = "loss-t"; }
+            else { resText = "DRAW"; style = "draw-t"; }
 
+            updateHistory(rNum, curP, curA, resText, style);
             document.getElementById('p-score').innerText = pScore;
             document.getElementById('a-score').innerText = aScore;
-            document.getElementById('msg').innerText = res;
+            document.getElementById('msg').innerText = resText === "DRAW" ? "무승부!" : `라운드 ${resText === "WIN" ? "승리" : "패배"}`;
             document.getElementById('btn-match').classList.add('hidden');
 
-            if (pScore >= 5 || aScore >= 5) { setTimeout(over, 1000); }
-            else { document.getElementById('btn-next').classList.remove('hidden'); }
+            if (pScore >= 5 || aScore >= 5 || rNum >= 9) { 
+                setTimeout(over, 1000); 
+            }
+            else { 
+                document.getElementById('btn-next').classList.remove('hidden'); 
+            }
+        }
+
+        function updateHistory(r, p, a, res, style) {
+            const list = document.getElementById('history-list');
+            const row = document.createElement('div');
+            row.className = "history-row flex justify-between items-center py-3";
+            const pC = checkB(p) ? "●" : "○";
+            const aC = checkB(a) ? "●" : "○";
+            row.innerHTML = `
+                <span class="text-zinc-600 font-bold">R${r}</span>
+                <span class="font-black text-black">${p}${pC} vs ${a}${aC}</span>
+                <span class="${style}">${res}</span>
+            `;
+            list.prepend(row);
         }
 
         function nextRound() {
@@ -190,12 +235,21 @@
         }
 
         function over() {
-            const win = pScore >= 5;
             document.getElementById('result-overlay').classList.remove('hidden');
             const fR = document.getElementById('final-res');
-            fR.innerText = win ? "VICTORY" : "DEFEAT";
-            fR.className = `text-8xl font-black mb-4 italic tracking-tighter ${win ? 'text-blue-500' : 'text-red-500'}`;
-            document.getElementById('final-scr').innerText = `${pScore} : ${aScore}`;
+            const fS = document.getElementById('final-scr');
+            fS.innerText = `${pScore} : ${aScore}`;
+
+            if (pScore > aScore) {
+                fR.innerText = "VICTORY";
+                fR.className = "text-9xl font-black mb-6 italic tracking-tighter text-blue-600";
+            } else if (pScore < aScore) {
+                fR.innerText = "DEFEAT";
+                fR.className = "text-9xl font-black mb-6 italic tracking-tighter text-red-600";
+            } else {
+                fR.innerText = "DRAW";
+                fR.className = "text-9xl font-black mb-6 italic tracking-tighter text-zinc-500";
+            }
         }
     </script>
 </body>
