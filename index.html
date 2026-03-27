@@ -1,1 +1,202 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Black & White Strategy</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@700;900&display=swap');
+        body { font-family: 'Pretendard', sans-serif; }
+        .black-t { background-color: #000; color: #fff; border: 2px solid #333; }
+        .white-t { background-color: #fff; color: #000; border: 2px solid #ddd; }
+        .selected-t { ring: 4px solid #3b82f6; ring-offset: 2px; transform: translateY(-5px); }
+        .used-t { opacity: 0.1; pointer-events: none; }
+    </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen flex items-center justify-center p-4">
 
+    <!-- 초기 설정 -->
+    <div id="start-overlay" class="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center p-6 text-center">
+        <h1 class="text-6xl font-black mb-4 tracking-tighter">BLACK & WHITE</h1>
+        <p class="text-zinc-500 mb-10">짝수는 흑(Black), 홀수는 백(White)</p>
+        <div class="flex flex-col w-64 gap-3">
+            <button onclick="init(true)" class="py-4 bg-white text-black font-black rounded-2xl hover:bg-zinc-200 transition">PLAYER 선공</button>
+            <button onclick="init(false)" class="py-4 bg-zinc-800 text-white font-black rounded-2xl hover:bg-zinc-700 transition">AI 선공</button>
+        </div>
+    </div>
+
+    <!-- 메인 게임 -->
+    <div id="game-wrap" class="w-full max-w-xl hidden">
+        <div class="flex justify-between items-center mb-8">
+            <div class="text-center">
+                <p class="text-[10px] text-zinc-500 font-bold uppercase">Player</p>
+                <p id="p-score" class="text-5xl font-black">0</p>
+            </div>
+            <div class="text-center">
+                <div id="round-txt" class="text-xs font-bold bg-zinc-800 px-3 py-1 rounded-full text-zinc-400 mb-2">ROUND 1</div>
+                <div id="turn-txt" class="text-sm font-bold text-blue-500">대기 중</div>
+            </div>
+            <div class="text-center">
+                <p class="text-[10px] text-zinc-500 font-bold uppercase">AI Bot</p>
+                <p id="a-score" class="text-5xl font-black">0</p>
+            </div>
+        </div>
+
+        <!-- AI 영역 -->
+        <div id="ai-hand" class="flex justify-center gap-1 mb-10 h-10"></div>
+
+        <!-- 대결 슬롯 -->
+        <div class="bg-zinc-900 rounded-3xl p-8 mb-10 border border-zinc-800">
+            <div class="flex justify-around items-center gap-4">
+                <div class="flex flex-col items-center gap-2">
+                    <div id="p-slot" class="w-20 h-28 rounded-2xl border-2 border-dashed border-zinc-700 flex items-center justify-center text-4xl font-black transition-all">?</div>
+                    <span class="text-[10px] font-bold text-zinc-600">MY SLOT</span>
+                </div>
+                <div class="text-2xl font-black text-zinc-800">VS</div>
+                <div class="flex flex-col items-center gap-2">
+                    <div id="a-slot" class="w-20 h-28 rounded-2xl border-2 border-dashed border-zinc-700 flex items-center justify-center text-4xl font-black transition-all">?</div>
+                    <span class="text-[10px] font-bold text-zinc-600">AI SLOT</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 메시지 및 컨트롤 -->
+        <div class="text-center mb-10">
+            <p id="msg" class="text-xl font-black text-zinc-300">타일을 골라주세요</p>
+            <div class="mt-6 flex justify-center">
+                <button id="btn-match" onclick="doMatch()" class="hidden px-14 py-4 bg-blue-600 text-white font-black rounded-2xl shadow-xl active:scale-95 transition">MATCH</button>
+                <button id="btn-next" onclick="nextRound()" class="hidden px-14 py-4 bg-zinc-100 text-black font-black rounded-2xl shadow-xl active:scale-95 transition">NEXT ROUND</button>
+            </div>
+        </div>
+
+        <!-- 내 손패 -->
+        <div class="bg-black p-6 rounded-3xl border border-zinc-800">
+            <div id="p-hand" class="flex justify-center gap-2 flex-wrap"></div>
+        </div>
+    </div>
+
+    <!-- 결과 -->
+    <div id="result-overlay" class="fixed inset-0 z-[60] bg-black hidden flex flex-col items-center justify-center p-6">
+        <h2 id="final-res" class="text-8xl font-black mb-4 italic tracking-tighter">VICTORY</h2>
+        <p id="final-scr" class="text-2xl font-bold text-zinc-500 mb-12">5 : 2</p>
+        <button onclick="location.reload()" class="px-14 py-5 bg-white text-black font-black rounded-2xl text-xl transition active:scale-95">RESTART</button>
+    </div>
+
+    <script>
+        let pTiles = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+        let aTiles = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+        let pScore = 0, aScore = 0, rNum = 1;
+        let pFirst = true; // 교대용
+        let curP = null, curA = null;
+
+        const checkB = (n) => n % 2 === 0;
+        const getStyle = (n) => checkB(n) ? 'black-t' : 'white-t';
+
+        function init(first) {
+            pFirst = first;
+            document.getElementById('start-overlay').style.display = 'none';
+            document.getElementById('game-wrap').classList.remove('hidden');
+            startRound();
+        }
+
+        function startRound() {
+            curP = null; curA = null;
+            document.getElementById('round-txt').innerText = `ROUND ${rNum}`;
+            document.getElementById('p-slot').innerText = "?";
+            document.getElementById('p-slot').className = "w-20 h-28 rounded-2xl border-2 border-dashed border-zinc-700 flex items-center justify-center text-4xl font-black transition-all";
+            document.getElementById('a-slot').innerText = "?";
+            document.getElementById('a-slot').className = "w-20 h-28 rounded-2xl border-2 border-dashed border-zinc-700 flex items-center justify-center text-4xl font-black transition-all";
+            document.getElementById('btn-match').classList.add('hidden');
+            document.getElementById('btn-next').classList.add('hidden');
+            
+            refreshUI();
+
+            if (!pFirst) {
+                // AI 선공
+                const idx = Math.floor(Math.random() * aTiles.length);
+                curA = aTiles[idx];
+                document.getElementById('turn-txt').innerText = "AI 선공";
+                document.getElementById('msg').innerText = "상대 타일 색상을 확인하세요";
+                const aSlot = document.getElementById('a-slot');
+                aSlot.className = `w-20 h-28 rounded-2xl flex items-center justify-center text-4xl font-black shadow-2xl ${getStyle(curA)}`;
+            } else {
+                document.getElementById('turn-txt').innerText = "PLAYER 선공";
+                document.getElementById('msg').innerText = "먼저 낼 타일을 고르세요";
+            }
+        }
+
+        function refreshUI() {
+            const pH = document.getElementById('p-hand');
+            const aH = document.getElementById('ai-hand');
+            pH.innerHTML = ''; aH.innerHTML = '';
+
+            [0, 1, 2, 3, 4, 5, 6, 7, 8].forEach(n => {
+                const used = !pTiles.includes(n);
+                const d = document.createElement('div');
+                d.className = `w-12 h-16 rounded-xl flex items-center justify-center font-black text-xl cursor-pointer transition-all ${getStyle(n)} ${used ? 'used-t' : ''}`;
+                d.innerText = n;
+                if(!used) d.onclick = () => pick(n, d);
+                pH.appendChild(d);
+            });
+
+            [0, 1, 2, 3, 4, 5, 6, 7, 8].forEach(n => {
+                const used = !aTiles.includes(n);
+                const d = document.createElement('div');
+                d.className = `w-6 h-8 rounded-md ${getStyle(n)} ${used ? 'opacity-0' : 'opacity-100'}`;
+                aH.appendChild(d);
+            });
+        }
+
+        function pick(n, el) {
+            curP = n;
+            document.querySelectorAll('#p-hand div').forEach(t => t.classList.remove('selected-t'));
+            el.classList.add('selected-t');
+            const pS = document.getElementById('p-slot');
+            pS.innerText = n;
+            pS.className = `w-20 h-28 rounded-2xl flex items-center justify-center text-4xl font-black shadow-2xl ${getStyle(n)}`;
+            document.getElementById('btn-match').classList.remove('hidden');
+        }
+
+        function doMatch() {
+            if (curA === null) {
+                const idx = Math.floor(Math.random() * aTiles.length);
+                curA = aTiles[idx];
+            }
+            pTiles = pTiles.filter(v => v !== curP);
+            aTiles = aTiles.filter(v => v !== curA);
+
+            const aS = document.getElementById('a-slot');
+            aS.innerText = curA;
+            aS.className = `w-20 h-28 rounded-2xl flex items-center justify-center text-4xl font-black shadow-2xl ${getStyle(curA)}`;
+
+            let res = "";
+            if (curP > curA) { pScore++; res = "ROUND WIN"; }
+            else if (curP < curA) { aScore++; res = "ROUND LOSS"; }
+            else { res = "DRAW"; }
+
+            document.getElementById('p-score').innerText = pScore;
+            document.getElementById('a-score').innerText = aScore;
+            document.getElementById('msg').innerText = res;
+            document.getElementById('btn-match').classList.add('hidden');
+
+            if (pScore >= 5 || aScore >= 5) { setTimeout(over, 1000); }
+            else { document.getElementById('btn-next').classList.remove('hidden'); }
+        }
+
+        function nextRound() {
+            rNum++; pFirst = !pFirst;
+            startRound();
+        }
+
+        function over() {
+            const win = pScore >= 5;
+            document.getElementById('result-overlay').classList.remove('hidden');
+            const fR = document.getElementById('final-res');
+            fR.innerText = win ? "VICTORY" : "DEFEAT";
+            fR.className = `text-8xl font-black mb-4 italic tracking-tighter ${win ? 'text-blue-500' : 'text-red-500'}`;
+            document.getElementById('final-scr').innerText = `${pScore} : ${aScore}`;
+        }
+    </script>
+</body>
+</html>
